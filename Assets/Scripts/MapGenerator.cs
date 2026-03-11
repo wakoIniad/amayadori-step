@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 using Unity.VisualScripting;
 using UnityEditor;
 using System;
+using UnityEditor.Tilemaps;
 
 
 [System.Serializable]
@@ -13,7 +14,8 @@ public class LayerSetting
 {
     public string name;
     public float DepthScale;
-    public List<GameObject> uniqueSprites = new List<GameObject>();
+    public List<TileSetting> uniqueSprites = new List<TileSetting>();
+    public float RefSize;
 }
 
 public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
@@ -56,6 +58,16 @@ class DropDownDrownerWithConstrains: PropertyDrawer
     }
 }
 
+[System.Serializable]
+public class TileSetting
+{
+    public float GenreValue;
+    public Sprite useSprite;
+    public UnityEngine.Vector2 getTransformPotition(UnityEngine.Vector2 leftBottomPosition, SpriteRenderer renderer)
+    {
+        return renderer.gameObject.transform.position + ((UnityEngine.Vector3)leftBottomPosition - renderer.bounds.min);
+    }
+}
 public class StageSettings
 {
     public List<LayerSetting> layers = new List<LayerSetting>()
@@ -97,18 +109,18 @@ public class StageSettings
             return this.layers.Find(i=>i.name==key);
         }
     }
-    public List<GameObject> carSprites = new List<GameObject>();
-    public RangeInt stageCoordinateHolizonalRange;
+    public List<Sprite> carSprites = new List<Sprite>();
+    public Span stageCoordinateHolizonalRange;
 }
 
-[System.Serializable]
+/*[System.Serializable]
 public class UseObjects
 {
     public List<GameObject> farbackgrounds = new List<GameObject>();
     public List<GameObject> backgrounds = new List<GameObject>();
     public List<GameObject> objects = new List<GameObject>();
     public List<GameObject> cars = new List<GameObject>();
-}
+}*/
 
 public class Util
 {
@@ -120,6 +132,52 @@ public class Util
     {
         return target - start > 0 && target - start < length;
     }
+    /*エイリアス法*/
+    public static Func<int> GetRandFuncFollowDiscreteDistribution(float[] distribution)
+    {
+        Queue<float> dist = new Queue<float>(distribution);
+        float min = distribution.Min();
+        float sum = distribution.Sum();
+        List<(float,int,int)> dict = new List<float[]>();
+        float[] tmp = new float[]{ dist.Dequeue(), 0 };
+        int index = 0;
+        while(dist.Count > 0)
+        {
+            
+            tmp[0] -= min;
+            dict.Add(
+            (
+               tmp[0] > 0 ? 1 : 1+tmp[0]/min, index, -1
+            ));
+
+            if(tmp[0] <= 0)
+            {
+                float use = dist.Dequeue();
+                use += tmp[0];
+                tmp[0] = use; 
+                index ++;
+                dict[dict.Count-1].Item3 = index;
+            }
+        }
+        //for(int i = 0; i < Math.Ceiling(sum/min);i++)
+        //{
+        //    tmp[0] -= min;
+        //    if(tmp[0] > 0)
+        //    {
+        //        
+        //    }
+        //};
+        
+        System.Random rand = new System.Random();
+        return () =>
+        {
+            float[] use = dict[rand.Next(0, dict.Count())];
+            if(rand.NextDouble() < use[0])
+            {
+                return use[1];
+            } return use[2];
+        };
+    }
 }
 
 
@@ -129,7 +187,6 @@ public class GameSettings
     public float baseSpeed;
     public float carSpeed;    
     public float carSpawnCondition = 1f;
-
 }
 
 public class MapGenerator: MonoBehaviour
@@ -144,6 +201,13 @@ public class MapGenerator: MonoBehaviour
       {"stage", new List<GameObject>(){}},
       {"front", new List<GameObject>(){}}  
     };
+    struct EachLayerProcessContext
+    {
+        public float LastObjectGenreValue;
+        public GameObject lastObject;
+    }
+    private Dictionary<string, GameObject> eachLayerLastObject
+     = new Dictionary<string, GameObject>();
 
     private Dictionary<string, List<GameObject>> functional_layer = new Dictionary<string, List<GameObject>>()
     {
@@ -192,6 +256,8 @@ public class MapGenerator: MonoBehaviour
     {
         foreach(var (layer, layerSetting) in layers.Values.Zip(stageSettings.layers, (a,b)=>(a,b)))
         {
+            float tmp_x_pos = float.NegativeInfinity;
+            GameObject tmp_last_obj = null;
             foreach(GameObject obj in layer)
             {
                 var pos = obj.transform.localPosition;
@@ -199,11 +265,16 @@ public class MapGenerator: MonoBehaviour
                 obj.transform.localPosition = pos;
 
                 Bounds area = GetComponent<SpriteRenderer>().bounds;
+                if(area.max.x > tmp_x_pos) {
+                    tmp_x_pos = area.max.x;
+                    tmp_last_obj = obj;
+                }
                 if(area.min.x < this.stageSettings.stageCoordinateHolizonalRange.start)
                 {
                     Destroy(obj);
                 }
             }
+            eachLayerLastObject[layerSetting.name] = tmp_last_obj;
         }
     }
     float first_end_of_roof = float.NegativeInfinity;
@@ -219,16 +290,11 @@ public class MapGenerator: MonoBehaviour
             if(obj.GetComponent<RoofSetting>())
             {
                 MapObjectSettings settings = obj.GetComponent<MapObjectSettings>();
-                if(
-                    Util.ContainInRange(
-                        @nowPlayerPosition,
-                        settings.range.start,
-                        settings.range.length
-                    )
-                )
-                {
+                
+                Span span = settings.GetSpan();
+                if(Util.Between(@nowPlayerPosition, span.start, span.end)) {
                     tmp_roof_proof = true;
-                    tmp_first_end_of_roof = settings.range.start + settings.range.length;
+                    tmp_first_end_of_roof = span.end;
                 }
             }
         }
@@ -238,16 +304,11 @@ public class MapGenerator: MonoBehaviour
     public void CarProcess()
     {
         foreach(GameObject obj in functional_layer["car"])
-        {   
+        {
             MapObjectSettings settings = obj.GetComponent<MapObjectSettings>();
 
-            if(
-                Util.ContainInRange(
-                    @nowPlayerPosition,
-                    settings.range.start,
-                    settings.range.length
-                )
-            )
+            Span span = settings.GetSpan();
+            if(Util.Between(@nowPlayerPosition, span.start, span.end))
             {
                 if(settings.layer > stageSettings.playerLayerIndex)
                 {   
@@ -277,7 +338,6 @@ public class MapGenerator: MonoBehaviour
         this.layers[this.stageSettings.GetLayerNameByIndex(layer)]
         .Add(target);
     }
-    
     public void CarGenerator()
     {
         if(first_end_of_roof - @nowPlayerPosition > gameSettings.carSpawnCondition && player_is_under_roof)
@@ -286,6 +346,32 @@ public class MapGenerator: MonoBehaviour
             obj.AddComponent<CarSetting>();
             obj.GetComponent<CarSetting>().speed = 1f;
             this.ApplyLayer(obj, 3);
+        }
+    }
+    private float _spawnBuffer = 64f;
+    public void BackgroundGenerator()
+    {
+        foreach(var (name, obj) in this.eachLayerLastObject)
+        {
+            SpriteRenderer renderer = obj.GetComponent<SpriteRenderer>();
+            TileSetting lastTs = obj.GetComponent<TileSetting>();
+            /*Unityのスプライトはpivotの位置が基準になるらしい*/
+            UnityEngine.Vector2 localPivotPos = renderer.sprite.pivot/renderer.sprite.pixelsPerUnit;
+            float endx = renderer.bounds.max.x;
+            if(endx - stageSettings.stageCoordinateHolizonalRange.end <= _spawnBuffer)
+            {
+                TileSetting[] useTiles = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastTs.GenreValue)).ToArray()[0..5];
+                //.Select(x => (Math.Abs(x.GenreValue - lastTs.GenreValue),x)).ToArray();
+                float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastTs.GenreValue)).ToArray();
+                float tmp_max = mass.Max();
+                mass = mass.Select(x => tmp_max - x).ToArray();
+                Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
+
+                Sprite sprite = renderer.sprite;
+                float spriteNaturalHeight = sprite.bounds.max.y - sprite.bounds.min.y;
+                float scale = stageSettings[name].RefSize/spriteNaturalHeight;
+            }
+
         }
     }
 }
