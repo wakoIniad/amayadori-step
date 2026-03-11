@@ -3,6 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.InputSystem;
+using Unity.VisualScripting;
+using UnityEditor;
+using System;
 
 
 [System.Serializable]
@@ -13,9 +16,39 @@ public class LayerSetting
     public List<GameObject> uniqueSprites = new List<GameObject>();
 }
 
+public enum ConstrainTypeAilias
+{
+    INCLUDE,
+    EXCLUDE
+}
+public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
+{
+    
+    public string paramName;
+    public ConstrainTypeAilias type;
+    public Func<object, object> mapper;
+    public DropdownWithConstrainOtherParamAttribute(string paramName, Func<object, object> mapper, ConstrainTypeAilias type)
+    {
+        this.paramName = paramName;
+        this.type = type;
+        this.mapper = mapper;
+    }
+}
+
+[CustomPropertyDrawer(typeof(DropdownWithConstrainOtherParamAttribute))]
+class DropDownDrownerWithConstrains: PropertyDrawer
+{
+     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        var casted = (DropdownWithConstrainOtherParamAttribute)attribute;
+        var listProp = property.serializedObject.FindProperty(casted.paramName);
+        
+    }
+}
+
 public class LayerManager
 {
-    List<LayerSetting> layers = new List<LayerSetting>()
+    public List<LayerSetting> layers = new List<LayerSetting>()
     {
         new LayerSetting()
         {
@@ -34,6 +67,8 @@ public class LayerManager
             name = "front"
         }
     };
+    [DropdownWithConstrainOtherParam("layers", i=>(object)(((LayerSetting)i).name), ConstrainTypeAilias.INCLUDE)]
+    public string playerLayer;
     public LayerSetting getLayerSettingByName(string name)
     {
         return this.layers.Find(layerSetting => layerSetting.name == name);
@@ -75,7 +110,7 @@ public class MapGenerator: MonoBehaviour
 {
     public UseObjects useObjects;
 
-    public Layers layerSettings;
+    public LayerManager layerSettings;
     private float[] _depthScale;
     public float baseSpeed;
     public float carSpeed;
