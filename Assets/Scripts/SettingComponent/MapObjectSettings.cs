@@ -3,6 +3,6 @@ using UnityEngine.SceneManagement;
 
 class MapObjectSettings: MonoBehaviour
 {
-    public string layer;
+    public int layer;
     public RangeInt range;
 }
