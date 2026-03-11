@@ -138,25 +138,28 @@ public class Util
         Queue<float> dist = new Queue<float>(distribution);
         float min = distribution.Min();
         float sum = distribution.Sum();
-        List<(float,int,int)> dict = new List<float[]>();
+        
+        float unit = min-(float)(sum%min/(Math.Ceiling(sum/min)-1));
+
+        List<(float,int)> dict = new List<(float, int)>();
         float[] tmp = new float[]{ dist.Dequeue(), 0 };
         int index = 0;
-        while(dist.Count > 0)
+        while(tmp[0] > 0)
         {
             
-            tmp[0] -= min;
+            tmp[0] -= unit;
             dict.Add(
             (
-               tmp[0] > 0 ? 1 : 1+tmp[0]/min, index, -1
+               tmp[0] > 0 ? 1 : 1+tmp[0]/unit, index//, -1
             ));
 
             if(tmp[0] <= 0)
             {
-                float use = dist.Dequeue();
+                float use = dist.Count > 0 ? dist.Dequeue() : float.NegativeInfinity;
                 use += tmp[0];
                 tmp[0] = use; 
                 index ++;
-                dict[dict.Count-1].Item3 = index;
+                //dict[dict.Count-1].Item3 = index;
             }
         }
         //for(int i = 0; i < Math.Ceiling(sum/min);i++)
@@ -171,11 +174,11 @@ public class Util
         System.Random rand = new System.Random();
         return () =>
         {
-            float[] use = dict[rand.Next(0, dict.Count())];
-            if(rand.NextDouble() < use[0])
+            (float, int) use = dict[rand.Next(0, dict.Count())];
+            if(rand.NextDouble() < use.Item1)
             {
-                return use[1];
-            } return use[2];
+                return use.Item2;
+            } return use.Item2+1;
         };
     }
 }
@@ -360,16 +363,25 @@ public class MapGenerator: MonoBehaviour
             float endx = renderer.bounds.max.x;
             if(endx - stageSettings.stageCoordinateHolizonalRange.end <= _spawnBuffer)
             {
+                UnityEngine.Vector2 targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
+
                 TileSetting[] useTiles = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastTs.GenreValue)).ToArray()[0..5];
                 //.Select(x => (Math.Abs(x.GenreValue - lastTs.GenreValue),x)).ToArray();
                 float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastTs.GenreValue)).ToArray();
                 float tmp_max = mass.Max();
                 mass = mass.Select(x => tmp_max - x).ToArray();
                 Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
-
-                Sprite sprite = renderer.sprite;
-                float spriteNaturalHeight = sprite.bounds.max.y - sprite.bounds.min.y;
+                TileSetting useTile = useTiles[rnd()];
+                
+                float spriteNaturalHeight = useTile.useSprite.bounds.max.y - useTile.useSprite.bounds.min.y;
                 float scale = stageSettings[name].RefSize/spriteNaturalHeight;
+
+                GameObject container = Instantiate();
+                container.AddComponent<SpriteRenderer>();
+                container.GetComponent<SpriteRenderer>().sprite = useTile.useSprite;
+                container.transform.localScale *= scale;
+                container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
+                
             }
 
         }
