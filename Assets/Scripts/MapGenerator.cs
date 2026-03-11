@@ -98,6 +98,7 @@ public class StageSettings
         }
     }
     public List<GameObject> carSprites = new List<GameObject>();
+    public RangeInt stageCoordinateHolizonalRange;
 }
 
 [System.Serializable]
@@ -153,8 +154,6 @@ public class MapGenerator: MonoBehaviour
     public bool player_is_under_roof = true;
     public bool player_is_moving = true;
 
-    public RangeInt screenHolizonalRange;
-
     public int playerLayer;
     void Start()
     {
@@ -198,6 +197,12 @@ public class MapGenerator: MonoBehaviour
                 var pos = obj.transform.localPosition;
                 pos.x -= gameSettings.baseSpeed/layerSetting.DepthScale;
                 obj.transform.localPosition = pos;
+
+                Bounds area = GetComponent<SpriteRenderer>().bounds;
+                if(area.min.x < this.stageSettings.stageCoordinateHolizonalRange.start)
+                {
+                    Destroy(obj);
+                }
             }
         }
     }
@@ -269,12 +274,18 @@ public class MapGenerator: MonoBehaviour
     public void ApplyLayer(GameObject target, int layer)
     {
         target.GetComponent<SpriteRenderer>().sortingOrder = layer;
+        this.layers[this.stageSettings.GetLayerNameByIndex(layer)]
+        .Add(target);
     }
+    
     public void CarGenerator()
     {
         if(first_end_of_roof - @nowPlayerPosition > gameSettings.carSpawnCondition && player_is_under_roof)
         {
             GameObject obj = Instantiate(stageSettings.carSprites[0]);
+            obj.AddComponent<CarSetting>();
+            obj.GetComponent<CarSetting>().speed = 1f;
+            this.ApplyLayer(obj, 3);
         }
     }
 }
