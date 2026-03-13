@@ -34,7 +34,14 @@ class DropDownDrownerWithConstrains: PropertyDrawer
      public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {
         var casted = (DropdownWithConstrainOtherParamAttribute)attribute;
-        var prop = property.serializedObject.targetObject.GetType()
+        string[] path =  property.propertyPath.Split('.');
+        object tmp_obj = property.serializedObject.targetObject;
+        for(int i = 0;i < path.Length-1;i++)
+        {
+            tmp_obj = tmp_obj.GetType().GetField(path[i]).GetValue(tmp_obj);
+        }
+
+        System.Reflection.PropertyInfo prop = tmp_obj.GetType()
         .GetProperty(casted.optionFieldName, 
         System.Reflection.BindingFlags.Public | 
         System.Reflection.BindingFlags.Instance | 
@@ -42,16 +49,16 @@ class DropDownDrownerWithConstrains: PropertyDrawer
         System.Reflection.BindingFlags.NonPublic
         );
 
-        if(prop.GetValue(property.serializedObject.targetObject) is string[] str_options) {
+        if(prop.GetValue(tmp_obj) is string[] str_options) {
             int index = EditorGUI.Popup(position, label.text, System.Array.IndexOf(str_options, property.stringValue), str_options);
             property.stringValue = str_options[index];
-        } else if(prop.GetValue(property.serializedObject.targetObject) is (string, int)[] tuple_options) {
+        } else if(prop.GetValue(tmp_obj) is (string, int)[] tuple_options) {
             int index = EditorGUI.IntPopup(position, label.text, property.intValue, 
                 tuple_options.Select(t=>t.Item1).ToArray(),
                 tuple_options.Select(t=>t.Item2).ToArray()
             );
             property.intValue = tuple_options[index].Item2;
-        }  else if(prop.GetValue(property.serializedObject.targetObject) is int[] int_options)
+        }  else if(prop.GetValue(tmp_obj) is int[] int_options)
         {
             int index = EditorGUI.Popup(position, label.text, System.Array.IndexOf(int_options, property.intValue), int_options.Select(i=>i.ToString()).ToArray());
             property.intValue = int_options[index];
@@ -69,6 +76,8 @@ public class TileSetting
         return renderer.gameObject.transform.position + ((UnityEngine.Vector3)leftBottomPosition - renderer.bounds.min);
     }
 }
+
+[System.Serializable]
 public class StageSettings
 {
     public List<LayerSetting> layers = new List<LayerSetting>()
@@ -91,7 +100,7 @@ public class StageSettings
         }
     };
     public string GetLayerNameByIndex(int index) => layers[index].name;
-    private (string, int)[] playerLayerOptions => layers.Select((obj,i) => (tag: obj.name, val: i)).ToArray();
+    public (string, int)[] playerLayerOptions => layers.Select((obj,i) => (tag: obj.name, val: i)).ToArray();
     [DropdownWithConstrainOtherParam("playerLayerOptions")]
     public int playerLayerIndex;
     public LayerSetting getLayerSettingByName(string name)
