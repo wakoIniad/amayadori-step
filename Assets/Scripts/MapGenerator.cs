@@ -7,6 +7,7 @@ using Unity.VisualScripting;
 using UnityEditor;
 using System;
 using UnityEditor.Tilemaps;
+using UnityEditor.Search;
 
 
 [System.Serializable]
@@ -100,9 +101,11 @@ public class StageSettings
         }
     };
     public string GetLayerNameByIndex(int index) => layers[index].name;
-    public (string, int)[] playerLayerOptions => layers.Select((obj,i) => (tag: obj.name, val: i)).ToArray();
-    [DropdownWithConstrainOtherParam("playerLayerOptions")]
+    public (string, int)[] layerOptions => layers.Select((obj,i) => (tag: obj.name, val: i)).ToArray();
+    [DropdownWithConstrainOtherParam("layerOptions")]
     public int playerLayerIndex;
+    [DropdownWithConstrainOtherParam("layerOptions")]
+    public int carLayerIndex;
     public LayerSetting getLayerSettingByName(string name)
     {
         return this.layers.Find(layerSetting => layerSetting.name == name);
@@ -201,6 +204,7 @@ public class GameSettings
     public float baseSpeed;
     public float carSpeed;    
     public float carSpawnCondition = 1f;
+
 }
 
 public class MapGenerator: MonoBehaviour
@@ -229,8 +233,8 @@ public class MapGenerator: MonoBehaviour
         { "roof", new List<GameObject>(){} }
     };
 
-    public bool player_is_under_roof = true;
-    public bool player_is_moving = true;
+    [System.NonSerialized]public bool player_is_under_roof = true;
+    [System.NonSerialized]public bool player_is_moving = true;
 
     public int playerLayer;
     void Start()
@@ -264,6 +268,21 @@ public class MapGenerator: MonoBehaviour
         if(player_is_moving) {
             MoveBackgrounds();
         }
+        BackgroundGenerator();
+        CarGenerator();
+    }
+
+    public float toDeltaVector(float t) 
+    {
+        return t * Time.deltaTime;
+    }
+    public UnityEngine.Vector2 toDeltaVector(UnityEngine.Vector2 t) 
+    {
+        return t * Time.deltaTime;
+    }
+    public UnityEngine.Vector3 toDeltaVector(UnityEngine.Vector3 t) 
+    {
+        return t * Time.deltaTime;
     }
 
     public void MoveBackgrounds()
@@ -275,7 +294,7 @@ public class MapGenerator: MonoBehaviour
             foreach(GameObject obj in layer)
             {
                 var pos = obj.transform.localPosition;
-                pos.x -= gameSettings.baseSpeed/layerSetting.DepthScale;
+                pos.x -= this.toDeltaVector(gameSettings.baseSpeed/layerSetting.DepthScale);
                 obj.transform.localPosition = pos;
 
                 Bounds area = GetComponent<SpriteRenderer>().bounds;
@@ -341,7 +360,7 @@ public class MapGenerator: MonoBehaviour
             }
             float rel_velocity = obj.GetComponent<CarSetting>().speed;
             var pos = obj.transform.localPosition;
-            pos.x -= rel_velocity/stageSettings[settings.layer].DepthScale;
+            pos.x -= this.toDeltaVector(rel_velocity/stageSettings[settings.layer].DepthScale);
             obj.transform.localPosition = pos;
         }
     }
@@ -358,7 +377,7 @@ public class MapGenerator: MonoBehaviour
             GameObject obj = Instantiate(stageSettings.CarFrame);
             obj.AddComponent<CarSetting>();
             obj.GetComponent<CarSetting>().speed = 1f;
-            this.ApplyLayer(obj, 3);
+            this.ApplyLayer(obj, this.stageSettings.carLayerIndex);
             obj.AddComponent<SpriteRenderer>();
             obj.GetComponent<SpriteRenderer>().sprite = stageSettings.carSprites[
                 (int)(UnityEngine.Random.value*stageSettings.carSprites.Count)

@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
+[System.Serializable]
 public class Span
 {
     public float start;
