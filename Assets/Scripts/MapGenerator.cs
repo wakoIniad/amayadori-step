@@ -16,6 +16,7 @@ public class LayerSetting
     public float DepthScale;
     public List<TileSetting> uniqueSprites = new List<TileSetting>();
     public float RefSize;
+    public GameObject Frame;
 }
 
 public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
@@ -109,8 +110,9 @@ public class StageSettings
             return this.layers.Find(i=>i.name==key);
         }
     }
-    public List<Sprite> carSprites = new List<Sprite>();
     public Span stageCoordinateHolizonalRange;
+    public List<Sprite> carSprites = new List<Sprite>();
+    public GameObject CarFrame;
 }
 
 /*[System.Serializable]
@@ -328,7 +330,6 @@ public class MapGenerator: MonoBehaviour
                     }
                 }
             }
-            
             float rel_velocity = obj.GetComponent<CarSetting>().speed;
             var pos = obj.transform.localPosition;
             pos.x -= rel_velocity/stageSettings[settings.layer].DepthScale;
@@ -345,10 +346,14 @@ public class MapGenerator: MonoBehaviour
     {
         if(first_end_of_roof - @nowPlayerPosition > gameSettings.carSpawnCondition && player_is_under_roof)
         {
-            GameObject obj = Instantiate(stageSettings.carSprites[0]);
+            GameObject obj = Instantiate(stageSettings.CarFrame);
             obj.AddComponent<CarSetting>();
             obj.GetComponent<CarSetting>().speed = 1f;
             this.ApplyLayer(obj, 3);
+            obj.AddComponent<SpriteRenderer>();
+            obj.GetComponent<SpriteRenderer>().sprite = stageSettings.carSprites[
+                (int)(UnityEngine.Random.value*stageSettings.carSprites.Count)
+            ];
         }
     }
     private float _spawnBuffer = 64f;
@@ -376,14 +381,12 @@ public class MapGenerator: MonoBehaviour
                 float spriteNaturalHeight = useTile.useSprite.bounds.max.y - useTile.useSprite.bounds.min.y;
                 float scale = stageSettings[name].RefSize/spriteNaturalHeight;
 
-                GameObject container = Instantiate();
+                GameObject container = Instantiate(this.stageSettings[name].Frame);
                 container.AddComponent<SpriteRenderer>();
                 container.GetComponent<SpriteRenderer>().sprite = useTile.useSprite;
                 container.transform.localScale *= scale;
                 container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
-                
             }
-
         }
     }
 }
