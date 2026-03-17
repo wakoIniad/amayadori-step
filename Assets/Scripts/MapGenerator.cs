@@ -17,7 +17,8 @@ public class LayerSetting
     public float DepthScale;
     public List<TileSetting> uniqueSprites = new List<TileSetting>();
     public float RefSize;
-    public GameObject Frame;
+    public GameObject FrameObject;
+    public Frame frame;
 }
 
 public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
@@ -72,6 +73,7 @@ public class TileSetting
 {
     public float GenreValue;
     public Sprite useSprite;
+    public float relativeVerticalPosition;
     public UnityEngine.Vector2 getTransformPotition(UnityEngine.Vector2 leftBottomPosition, SpriteRenderer renderer)
     {
         return renderer.gameObject.transform.position + ((UnityEngine.Vector3)leftBottomPosition - renderer.bounds.min);
@@ -100,6 +102,7 @@ public class StageSettings
             name = "front"
         }
     };
+    public int GetLayerIndexByName(string name) => Array.IndexOf(layers.Select(o=>o.name).ToArray(), name);
     public string GetLayerNameByIndex(int index) => layers[index].name;
     public (string, int)[] layerOptions => layers.Select((obj,i) => (tag: obj.name, val: i)).ToArray();
     [DropdownWithConstrainOtherParam("layerOptions")]
@@ -122,7 +125,8 @@ public class StageSettings
             return this.layers.Find(i=>i.name==key);
         }
     }
-    public Span stageCoordinateHolizonalRange;
+    //public Span stageCoordinateHolizonalRange;
+    public Frame screenFrame;
     public List<Sprite> carSprites = new List<Sprite>();
     public GameObject CarFrame;
 }
@@ -204,6 +208,7 @@ public class GameSettings
     public float baseSpeed;
     public float carSpeed;    
     public float carSpawnCondition = 1f;
+    public float carIdealSize;
 
 }
 
@@ -302,7 +307,7 @@ public class MapGenerator: MonoBehaviour
                     tmp_x_pos = area.max.x;
                     tmp_last_obj = obj;
                 }
-                if(area.min.x < this.stageSettings.stageCoordinateHolizonalRange.start)
+                if(area.min.x < this.stageSettings.screenFrame.start.x)
                 {
                     Destroy(obj);
                 }
@@ -370,50 +375,90 @@ public class MapGenerator: MonoBehaviour
         this.layers[this.stageSettings.GetLayerNameByIndex(layer)]
         .Add(target);
     }
+    
+    public void ApplyLayer(GameObject target, string name)
+    {
+        target.GetComponent<SpriteRenderer>().sortingOrder 
+            = this.stageSettings.GetLayerIndexByName(name);
+        this.layers[name]
+        .Add(target);
+    }
+
     public void CarGenerator()
     {
         if(first_end_of_roof - @nowPlayerPosition > gameSettings.carSpawnCondition && player_is_under_roof)
         {
             GameObject obj = Instantiate(stageSettings.CarFrame);
-            obj.AddComponent<CarSetting>();
-            obj.GetComponent<CarSetting>().speed = 1f;
+            var carSetting = obj.AddComponent<CarSetting>();
+            carSetting.speed = 1f;
             this.ApplyLayer(obj, this.stageSettings.carLayerIndex);
-            obj.AddComponent<SpriteRenderer>();
-            obj.GetComponent<SpriteRenderer>().sprite = stageSettings.carSprites[
+            
+            this.AdjustIdealFrameHeight(obj, this.gameSettings.carIdealSize, obj.AddComponent<SpriteRenderer>(), stageSettings.carSprites[
                 (int)(UnityEngine.Random.value*stageSettings.carSprites.Count)
-            ];
+            ]);
         }
     }
     private float _spawnBuffer = 64f;
+    
+    public void AdjustIdealFrameHeight(GameObject frame, float idealHeight, SpriteRenderer renderer = default, Sprite useSprite = default)
+    {
+        if(renderer == default(SpriteRenderer))renderer = frame.GetComponent<SpriteRenderer>();
+        if(useSprite != default(Sprite))
+        {
+            renderer.sprite = useSprite;
+        }
+        float spriteNaturalHeight = renderer.bounds.max.y - renderer.bounds.min.y;
+        float scale = idealHeight/spriteNaturalHeight;
+        frame.transform.localScale *= scale;
+
+    }
+    public float GetAbsoluteVerticalPosition(Frame frame, float relativeVerticalPosition)
+    {
+        return (float)(frame.start.y + 
+        (relativeVerticalPosition-0.5)*2 * (frame.start.y - frame.end.y));
+    }
+
+    private float initGenreValue = 0;
+    private UnityEngine.Vector2 initTargetPos = new UnityEngine.Vector2();
     public void BackgroundGenerator()
     {
         foreach(var (name, obj) in this.eachLayerLastObject)
         {
-            SpriteRenderer renderer = obj.GetComponent<SpriteRenderer>();
-            TileSetting lastTs = obj.GetComponent<TileSetting>();
-            /*Unityのスプライトはpivotの位置が基準になるらしい*/
-            UnityEngine.Vector2 localPivotPos = renderer.sprite.pivot/renderer.sprite.pixelsPerUnit;
-            float endx = renderer.bounds.max.x;
-            if(endx - stageSettings.stageCoordinateHolizonalRange.end <= _spawnBuffer)
+            
+            float endx;
+            float lastGenreValue;
+            UnityEngine.Vector2 targetPos;
+            if(obj) {
+                SpriteRenderer renderer = obj.GetComponent<SpriteRenderer>();
+                TileSetting lastTs = obj.GetComponent<TileSetting>();
+                /*Unityのスプライトはpivotの位置が基準になるらしい*/
+                UnityEngine.Vector2 localPivotPos = renderer.sprite.pivot/renderer.sprite.pixelsPerUnit;
+                endx = renderer.bounds.max.x;
+                lastGenreValue = lastTs.GenreValue;
+                targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
+            } else
             {
-                UnityEngine.Vector2 targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
-
-                TileSetting[] useTiles = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastTs.GenreValue)).ToArray()[0..5];
+                endx = stageSettings.screenFrame.end.x;
+                lastGenreValue = initGenreValue;
+                targetPos = new UnityEngine.Vector2(
+                    endx, 
+                    this.GetAbsoluteVerticalPosition(this.stageSettings[name], )
+                );//initTargetPos;
+            }
+            if(endx - stageSettings.screenFrame.end.x <= _spawnBuffer)
+            {
+                TileSetting[] useTiles = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastGenreValue)).ToArray()[0..5];
                 //.Select(x => (Math.Abs(x.GenreValue - lastTs.GenreValue),x)).ToArray();
-                float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastTs.GenreValue)).ToArray();
+                float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastGenreValue)).ToArray();
                 float tmp_max = mass.Max();
                 mass = mass.Select(x => tmp_max - x).ToArray();
                 Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
                 TileSetting useTile = useTiles[rnd()];
-                
-                float spriteNaturalHeight = useTile.useSprite.bounds.max.y - useTile.useSprite.bounds.min.y;
-                float scale = stageSettings[name].RefSize/spriteNaturalHeight;
 
-                GameObject container = Instantiate(this.stageSettings[name].Frame);
-                container.AddComponent<SpriteRenderer>();
-                container.GetComponent<SpriteRenderer>().sprite = useTile.useSprite;
-                container.transform.localScale *= scale;
+                GameObject container = Instantiate(this.stageSettings[name].FrameObject);
+                this.AdjustIdealFrameHeight(container, stageSettings[name].RefSize, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
                 container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
+                this.ApplyLayer(container, name);
             }
         }
     }

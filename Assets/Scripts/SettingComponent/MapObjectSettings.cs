@@ -12,6 +12,12 @@ public class Span
         this.end = end;
     }
 }
+[System.Serializable]
+public class Frame
+{
+    public UnityEngine.Vector2 start;
+    public UnityEngine.Vector2 end; 
+} 
 class MapObjectSettings: MonoBehaviour
 {
     public int layer;
