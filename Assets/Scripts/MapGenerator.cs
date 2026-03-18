@@ -19,6 +19,7 @@ public class LayerSetting
     public float RefSize;
     public GameObject FrameObject;
     public Frame frame;
+    public GameObject framer;
 }
 
 public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
@@ -435,25 +436,31 @@ public class MapGenerator: MonoBehaviour
                 UnityEngine.Vector2 localPivotPos = renderer.sprite.pivot/renderer.sprite.pixelsPerUnit;
                 endx = renderer.bounds.max.x;
                 lastGenreValue = lastTs.GenreValue;
-                targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
+                //targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
             } else
             {
                 endx = stageSettings.screenFrame.end.x;
                 lastGenreValue = initGenreValue;
-                targetPos = new UnityEngine.Vector2(
-                    endx, 
-                    this.GetAbsoluteVerticalPosition(this.stageSettings[name], )
-                );//initTargetPos;
+                //targetPos = new UnityEngine.Vector2(
+                //    endx, 
+                //    this.GetAbsoluteVerticalPosition(this.stageSettings[name], )
+                //);//initTargetPos;
             }
             if(endx - stageSettings.screenFrame.end.x <= _spawnBuffer)
             {
-                TileSetting[] useTiles = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastGenreValue)).ToArray()[0..5];
+                var tmp = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastGenreValue)).ToArray();
+                TileSetting[] useTiles = tmp[0..Math.Min(5, tmp.Length)];
                 //.Select(x => (Math.Abs(x.GenreValue - lastTs.GenreValue),x)).ToArray();
                 float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastGenreValue)).ToArray();
                 float tmp_max = mass.Max();
                 mass = mass.Select(x => tmp_max - x).ToArray();
                 Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
                 TileSetting useTile = useTiles[rnd()];
+
+                targetPos = new UnityEngine.Vector2(
+                    endx, 
+                    this.GetAbsoluteVerticalPosition(this.stageSettings[name].frame, useTile.relativeVerticalPosition)
+                );
 
                 GameObject container = Instantiate(this.stageSettings[name].FrameObject);
                 this.AdjustIdealFrameHeight(container, stageSettings[name].RefSize, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
