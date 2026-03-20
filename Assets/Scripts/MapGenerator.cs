@@ -18,8 +18,7 @@ public class LayerSetting
     public List<TileSetting> uniqueSprites = new List<TileSetting>();
     public float RefSize;
     public GameObject FrameObject;
-    public Frame frame;
-    public GameObject framer;
+    public GameObject frame;
 }
 
 public class DropdownWithConstrainOtherParamAttribute : PropertyAttribute
@@ -421,6 +420,11 @@ public class MapGenerator: MonoBehaviour
 
     private float initGenreValue = 0;
     private UnityEngine.Vector2 initTargetPos = new UnityEngine.Vector2();
+    public Frame GetFrameFromCollider(GameObject target)
+    {
+        BoxCollider2D collider = target.GetComponent<BoxCollider2D>();
+        return new Frame(collider.bounds.min, collider.bounds.max);
+    }
     public void BackgroundGenerator()
     {
         foreach(var (name, obj) in this.eachLayerLastObject)
@@ -457,14 +461,14 @@ public class MapGenerator: MonoBehaviour
                 Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
                 TileSetting useTile = useTiles[rnd()];
 
-                targetPos = new UnityEngine.Vector2(
-                    endx, 
-                    this.GetAbsoluteVerticalPosition(this.stageSettings[name].frame, useTile.relativeVerticalPosition)
-                );
+                //targetPos = new UnityEngine.Vector2(
+                //    endx, 
+                //    this.GetAbsoluteVerticalPosition(this.stageSettings[name].frame, useTile.relativeVerticalPosition)
+                //);
 
                 GameObject container = Instantiate(this.stageSettings[name].FrameObject);
                 this.AdjustIdealFrameHeight(container, stageSettings[name].RefSize, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
-                container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
+                //container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
                 this.ApplyLayer(container, name);
             }
         }

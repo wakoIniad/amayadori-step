@@ -16,7 +16,12 @@ public class Span
 public class Frame
 {
     public UnityEngine.Vector2 start;
-    public UnityEngine.Vector2 end; 
+    public UnityEngine.Vector2 end;
+    public Frame(UnityEngine.Vector2 start, UnityEngine.Vector2 end)
+    {
+        this.start = start;
+        this.end = end;
+    }
 } 
 class MapObjectSettings: MonoBehaviour
 {
