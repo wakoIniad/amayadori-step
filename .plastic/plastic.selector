@@ -1,0 +1,4 @@
+repository "mizutamari_jump/amayadori-step@15669155483120@cloud"
+  path "/"
+    br "/main"
+    co "/main"

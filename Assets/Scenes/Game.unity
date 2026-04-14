@@ -605,7 +605,7 @@ MonoBehaviour:
         useSprite: {fileID: 21300000, guid: 747f2ed62b42d474fba4fa784df69c8e, type: 3}
         relativeVerticalPosition: 0
       RefSize: 0
-      FrameObject: {fileID: 0}
+      FrameObject: {fileID: 3137422266529120550, guid: c2edb15364162ab4d9a702057cfca69d, type: 3}
       frame: {fileID: 767496253}
     - name: close
       DepthScale: 1.5
@@ -614,7 +614,7 @@ MonoBehaviour:
         useSprite: {fileID: 21300000, guid: 747f2ed62b42d474fba4fa784df69c8e, type: 3}
         relativeVerticalPosition: 0
       RefSize: 0
-      FrameObject: {fileID: 0}
+      FrameObject: {fileID: 3137422266529120550, guid: 021803bc84953ad4ba8efebd03fd0b73, type: 3}
       frame: {fileID: 813514138}
     - name: stage
       DepthScale: 1
@@ -623,7 +623,7 @@ MonoBehaviour:
         useSprite: {fileID: 21300000, guid: 747f2ed62b42d474fba4fa784df69c8e, type: 3}
         relativeVerticalPosition: 0
       RefSize: 0
-      FrameObject: {fileID: 0}
+      FrameObject: {fileID: 3137422266529120550, guid: a1f4eced6c4bf4c488c5acc986aa39ee, type: 3}
       frame: {fileID: 73765428}
     - name: front
       DepthScale: 0.8
@@ -632,7 +632,7 @@ MonoBehaviour:
         useSprite: {fileID: 21300000, guid: 747f2ed62b42d474fba4fa784df69c8e, type: 3}
         relativeVerticalPosition: 0
       RefSize: 0
-      FrameObject: {fileID: 0}
+      FrameObject: {fileID: 7742448756478308596, guid: 363cce340273c8141acc869036c19c28, type: 3}
       frame: {fileID: 329660304}
     playerLayerIndex: 2
     carLayerIndex: 3

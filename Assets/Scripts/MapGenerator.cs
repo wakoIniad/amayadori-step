@@ -150,14 +150,15 @@ public class Util
     {
         return target - start > 0 && target - start < length;
     }
-    /*エイリアス法*/
+    /*エイリアス法(シンプルで計算量の少ない確率質量分布に従った疑似ランダム関数)*/
+    /*https://qiita.com/kaityo256/items/1656597198cbfeb7328c*/
     public static Func<int> GetRandFuncFollowDiscreteDistribution(float[] distribution)
     {
         Queue<float> dist = new Queue<float>(distribution);
         float min = distribution.Min();
         float sum = distribution.Sum();
         
-        float unit = min-(float)(sum%min/(Math.Ceiling(sum/min)-1));
+        float unit = min-((float)(sum%min/(Math.Ceiling(sum/min)-1)) is var @a && float.IsFinite(@a) ? @a: 0);
 
         List<(float,int)> dict = new List<(float, int)>();
         float[] tmp = new float[]{ dist.Dequeue(), 0 };
@@ -168,7 +169,7 @@ public class Util
             tmp[0] -= unit;
             dict.Add(
             (
-               tmp[0] > 0 ? 1 : 1+tmp[0]/unit, index//, -1
+               tmp[0] >= 0 ? 1 : 1+tmp[0]/unit, index//, -1
             ));
 
             if(tmp[0] <= 0)
@@ -224,17 +225,22 @@ public class MapGenerator: MonoBehaviour
       {"stage", new List<GameObject>(){}},
       {"front", new List<GameObject>(){}}  
     };
-    struct EachLayerProcessContext
+    class EachLayerProcessContext
     {
-        public float LastObjectGenreValue;
-        public GameObject lastObject;
+        public float GenreValue;
+        public GameObject targetObject;
+        public EachLayerProcessContext(float genre, GameObject target)
+        {
+            this.GenreValue = genre;
+            this.targetObject = target;
+        }
     }
-    private Dictionary<string, GameObject> eachLayerLastObject
-     = new Dictionary<string, GameObject>();
+    private Dictionary<string, EachLayerProcessContext> eachLayerLastObject
+     = new Dictionary<string, EachLayerProcessContext>();
 
     private Dictionary<string, List<GameObject>> functional_layer = new Dictionary<string, List<GameObject>>()
     {
-        { "car", new List<GameObject>(){} },
+        { "car", new List<GameObject>(){}  },
         { "roof", new List<GameObject>(){} }
     };
 
@@ -294,25 +300,25 @@ public class MapGenerator: MonoBehaviour
     {
         foreach(var (layer, layerSetting) in layers.Values.Zip(stageSettings.layers, (a,b)=>(a,b)))
         {
-            float tmp_x_pos = float.NegativeInfinity;
-            GameObject tmp_last_obj = null;
+            //float tmp_x_pos = float.NegativeInfinity;
+            //GameObject tmp_last_obj = null;
             foreach(GameObject obj in layer)
             {
                 var pos = obj.transform.localPosition;
                 pos.x -= this.toDeltaVector(gameSettings.baseSpeed/layerSetting.DepthScale);
                 obj.transform.localPosition = pos;
 
-                Bounds area = GetComponent<SpriteRenderer>().bounds;
-                if(area.max.x > tmp_x_pos) {
-                    tmp_x_pos = area.max.x;
-                    tmp_last_obj = obj;
-                }
+                Bounds area = obj.GetComponent<SpriteRenderer>().bounds;
+                //if(area.max.x > tmp_x_pos) {
+                //    tmp_x_pos = area.max.x;
+                //    tmp_last_obj = obj;
+                //}
                 if(area.min.x < this.stageSettings.screenFrame.start.x)
                 {
                     Destroy(obj);
                 }
             }
-            eachLayerLastObject[layerSetting.name] = tmp_last_obj;
+            //eachLayerLastObject[layerSetting.name] = new EachLayerProcessContext();
         }
     }
     float first_end_of_roof = float.NegativeInfinity;
@@ -412,6 +418,15 @@ public class MapGenerator: MonoBehaviour
         frame.transform.localScale *= scale;
 
     }
+    void Awake()
+    {
+        foreach(string name in this.layers.Keys) {
+            if(!this.eachLayerLastObject.ContainsKey(name))
+            {
+                this.eachLayerLastObject[name] = new EachLayerProcessContext(float.NaN, null);
+            }
+        }
+    }
     public float GetAbsoluteVerticalPosition(Frame frame, float relativeVerticalPosition)
     {
         return (float)(frame.start.y + 
@@ -427,19 +442,19 @@ public class MapGenerator: MonoBehaviour
     }
     public void BackgroundGenerator()
     {
-        foreach(var (name, obj) in this.eachLayerLastObject)
+        foreach(var (name, context) in this.eachLayerLastObject)
         {
             
             float endx;
             float lastGenreValue;
-            UnityEngine.Vector2 targetPos;
-            if(obj) {
-                SpriteRenderer renderer = obj.GetComponent<SpriteRenderer>();
-                TileSetting lastTs = obj.GetComponent<TileSetting>();
+            UnityEngine.Vector2 targetPos;    
+            if(context.targetObject) {
+                SpriteRenderer renderer = context.targetObject.GetComponent<SpriteRenderer>();
+                //TileSetting lastTs = obj.GetComponent<TileSetting>();
                 /*Unityのスプライトはpivotの位置が基準になるらしい*/
                 UnityEngine.Vector2 localPivotPos = renderer.sprite.pivot/renderer.sprite.pixelsPerUnit;
                 endx = renderer.bounds.max.x;
-                lastGenreValue = lastTs.GenreValue;
+                lastGenreValue = context.GenreValue;
                 //targetPos = new UnityEngine.Vector2(renderer.bounds.max.x, renderer.bounds.min.y);
             } else
             {
@@ -450,6 +465,7 @@ public class MapGenerator: MonoBehaviour
                 //    this.GetAbsoluteVerticalPosition(this.stageSettings[name], )
                 //);//initTargetPos;
             }
+            Debug.Log($"{endx - stageSettings.screenFrame.end.x <= _spawnBuffer} {endx - stageSettings.screenFrame.end.x} {_spawnBuffer}");
             if(endx - stageSettings.screenFrame.end.x <= _spawnBuffer)
             {
                 var tmp = stageSettings[name].uniqueSprites.OrderBy(a => Math.Abs(a.GenreValue - lastGenreValue)).ToArray();
@@ -457,8 +473,24 @@ public class MapGenerator: MonoBehaviour
                 //.Select(x => (Math.Abs(x.GenreValue - lastTs.GenreValue),x)).ToArray();
                 float[] mass = useTiles.Select(x => Math.Abs(x.GenreValue - lastGenreValue)).ToArray();
                 float tmp_max = mass.Max();
+                tmp_max = tmp_max == 0 ? 1: tmp_max;
                 mass = mass.Select(x => tmp_max - x).ToArray();
+                //Debug.Log(useTiles);
+                //Debug.Log(mass);
+                //Debug.Log($@"Distribution {((Func<string>)(()=>{
+                //    string res = "";
+                //    foreach(float m in mass)
+                //    {
+                //        res += m.ToString() + ", ";
+                //    }
+                //    return res;
+                //}))()} | {mass.Length}");
                 Func<int> rnd = Util.GetRandFuncFollowDiscreteDistribution(mass);
+                //Debug.Log(rnd());
+                //Debug.Log(rnd());
+                //Debug.Log(rnd());
+                //Debug.Log(rnd());
+                //Debug.Log(rnd());
                 TileSetting useTile = useTiles[rnd()];
 
                 //targetPos = new UnityEngine.Vector2(
@@ -467,9 +499,18 @@ public class MapGenerator: MonoBehaviour
                 //);
 
                 GameObject container = Instantiate(this.stageSettings[name].FrameObject);
-                this.AdjustIdealFrameHeight(container, stageSettings[name].RefSize, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
+                //container.AddComponent<TileSetting>();
+                this.AdjustIdealFrameHeight(container, stageSettings[name].frame.GetComponent<BoxCollider2D>().bounds is var a ? (float)(a.max.y - a.min.y): 0, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
                 //container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
                 this.ApplyLayer(container, name);
+                container.transform.position = new Vector3(
+                    container.transform.position.x + endx - container.GetComponent<SpriteRenderer>().bounds.min.x,
+                    container.transform.position.y,
+                    container.transform.position.z
+                );
+                
+                this.eachLayerLastObject[name].targetObject = container;
+                this.eachLayerLastObject[name].GenreValue = useTile.GenreValue;
             }
         }
     }
