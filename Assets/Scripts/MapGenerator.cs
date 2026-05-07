@@ -399,14 +399,14 @@ public class MapGenerator: MonoBehaviour
             carSetting.speed = 1f;
             this.ApplyLayer(obj, this.stageSettings.carLayerIndex);
             
-            this.AdjustIdealFrameHeight(obj, this.gameSettings.carIdealSize, obj.AddComponent<SpriteRenderer>(), stageSettings.carSprites[
+            this.AdjustIdealFrameHeight(obj, this.gameSettings.carIdealSize, this.stageSettings.getLayerSettingByName("front").frame, obj.AddComponent<SpriteRenderer>(), stageSettings.carSprites[
                 (int)(UnityEngine.Random.value*stageSettings.carSprites.Count)
             ]);
         }
     }
     private float _spawnBuffer = 64f;
     
-    public void AdjustIdealFrameHeight(GameObject frame, float idealHeight, SpriteRenderer renderer = default, Sprite useSprite = default)
+    public void AdjustIdealFrameHeight(GameObject frame, float idealHeight, GameObject targetFrame, SpriteRenderer renderer = default, Sprite useSprite = default)
     {
         if(renderer == default(SpriteRenderer))renderer = frame.GetComponent<SpriteRenderer>();
         if(useSprite != default(Sprite))
@@ -416,6 +416,12 @@ public class MapGenerator: MonoBehaviour
         float spriteNaturalHeight = renderer.bounds.max.y - renderer.bounds.min.y;
         float scale = idealHeight/spriteNaturalHeight;
         frame.transform.localScale *= scale;
+
+        frame.transform.position -= new UnityEngine.Vector3(
+            renderer.bounds.min.x-targetFrame.GetComponent<BoxCollider2D>().bounds.min.x,    
+            renderer.bounds.min.y-targetFrame.GetComponent<BoxCollider2D>().bounds.min.y,
+            0
+        );
 
     }
     void Awake()
@@ -500,7 +506,7 @@ public class MapGenerator: MonoBehaviour
 
                 GameObject container = Instantiate(this.stageSettings[name].FrameObject);
                 //container.AddComponent<TileSetting>();
-                this.AdjustIdealFrameHeight(container, stageSettings[name].frame.GetComponent<BoxCollider2D>().bounds is var a ? (float)(a.max.y - a.min.y): 0, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
+                this.AdjustIdealFrameHeight(container, stageSettings[name].frame.GetComponent<BoxCollider2D>().bounds is var a ? (float)(a.max.y - a.min.y): 0, stageSettings[name].frame, container.AddComponent<SpriteRenderer>(), useTile.useSprite);
                 //container.transform.position = useTile.getTransformPotition(targetPos, container.GetComponent<SpriteRenderer>());
                 this.ApplyLayer(container, name);
                 container.transform.position = new Vector3(

@@ -13,7 +13,7 @@ public class PlayerControl : MonoBehaviour
         UMBRELLA_FRONT,
         UMBRELLA_UP
     }
-    public PlayerState playerState;
+    public PlayerState playerState = PlayerState.UMBRELLA_BACK;
     void Start()
     {
         IntergrationManager.instance.playerControl = this;
